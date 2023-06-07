@@ -53,8 +53,11 @@ class QuadEnv:
         startOrientation = p.getQuaternionFromEuler([0,0,0])
         self.droneId = p.loadURDF("cf2x.urdf",startPos, startOrientation)
     
-    def step(self, action: np.ndarray):
-        F, T = self._calculate_F_T(self._calculate_rpm(action))
+    def step(self, action: np.ndarray, rpm= False):
+        if(rpm):
+            F, T = self._calculate_F_T(action)
+        else:
+            F, T = self._calculate_F_T(self._calculate_rpm(action))
         self._apply_F_T(F, T)
         p.stepSimulation()
         
