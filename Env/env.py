@@ -51,7 +51,7 @@ class QuadEnv:
         
         startPos = [0,0,1]
         startOrientation = p.getQuaternionFromEuler([0,0,0])
-        self.droneId = p.loadURDF("cf2x.urdf",startPos, startOrientation)
+        self.droneId = p.loadURDF("Env/cf2x.urdf",startPos, startOrientation)
     
     def step(self, action: np.ndarray, rpm= False):
         if(rpm):
