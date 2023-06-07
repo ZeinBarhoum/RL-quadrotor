@@ -7,7 +7,7 @@ import torch
 import numpy as np
 
 if __name__ == "__main__":
-    env_no_gui_train = QuadEnv(REAL_TIME= False, GUI= True, FLOOR = True)
+    env_no_gui_train = QuadEnv(REAL_TIME= False, GUI= True, FLOOR = True, ONE_COMMAND= True, MODE= 'Hover')
     # env_no_gui_eval = QuadEnv(REAL_TIME= False, GUI= False, FLOOR = False)
 
     
@@ -25,7 +25,8 @@ if __name__ == "__main__":
                            net_arch=[512, 512, dict(vf=[256, 128], pi=[256, 128])]
                            )
     
-    model = PPO(a2cppoMlpPolicy, env_no_gui_train, verbose= 1, policy_kwargs=onpolicy_kwargs,).learn(total_timesteps=100000, callback= eval_callback, log_interval= 100)
+    # model = PPO(a2cppoMlpPolicy, env_no_gui_train, verbose= 1, policy_kwargs=onpolicy_kwargs,).learn(total_timesteps=100000, callback= eval_callback, log_interval= 100)
+    model = A2C(a2cppoMlpPolicy, env_no_gui_train, verbose= 1).learn(total_timesteps=10000, callback= eval_callback, log_interval= 100)
     
     model.save("Hover")
 
@@ -36,7 +37,7 @@ if __name__ == "__main__":
     
     model = A2C.load("Hover")
     
-    env_gui = QuadEnv(REAL_TIME= True)
+    env_gui = QuadEnv(REAL_TIME= True, ONE_COMMAND= True)
     
     obs = env_gui.reset()
     

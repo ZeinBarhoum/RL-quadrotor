@@ -15,7 +15,7 @@ class QuadEnv(gym.Env):
     
     metadata = {'render.modes': ['human']}
     
-    def __init__(self, EPS_TIME= 5, LOG_TIME= 0.1, REAL_TIME=False, GUI= True, FLOOR= True):
+    def __init__(self, EPS_TIME= 5, LOG_TIME= 0.1, REAL_TIME=False, GUI= True, FLOOR= True, ONE_COMMAND= False, MODE = 'Hover'):
         
         self.FLOOR = FLOOR
         self.REAL_TIME = bool(REAL_TIME)
@@ -39,9 +39,12 @@ class QuadEnv(gym.Env):
         p.setAdditionalSearchPath(pybullet_data.getDataPath())
         
         
-        self.DesiredPos = np.array([0,0,2])
-        self.StartPos = np.array([0,0,0.5])
-
+        self.DesiredPos = np.array([0,0,1])
+        if(MODE == 'Hover'):
+            self.StartPos = np.array([0,0,1])
+        else:
+            self.StartPos = np.array([0,0,0.5])
+            
         self.current_step = 0
         
         self.logtime = []
@@ -57,7 +60,11 @@ class QuadEnv(gym.Env):
         
         self.MAX_ROLL_PITCH = np.pi
         
-        self.action_space = gym.spaces.Box(low=-1*np.ones(4), high=np.ones(4), dtype=np.float32)
+        self.ONE_COMMAND = ONE_COMMAND
+        size = 4
+        if(self.ONE_COMMAND):
+            size = 1
+        self.action_space = gym.spaces.Box(low=-1*np.ones(size), high=np.ones(size), dtype=np.float32)
         
         self.observation_space = gym.spaces.Box(low=np.array([-1,-1,0,-1,-1,-1,-1,-1,-1,-1,-1,-1]), 
                                                 high= np.array([1,1,1, 1,1,1, 1,1,1, 1,1,1]), 
@@ -88,6 +95,9 @@ class QuadEnv(gym.Env):
         return self._normalize_Observation(self._getObservation())
     
     def step(self, action: np.ndarray, rpm= False):
+        if(self.ONE_COMMAND):
+            action = np.array([action]*4).reshape(4,)
+            
         if(rpm):
             F, T = self._calculate_F_T(action)
         else:
@@ -284,6 +294,10 @@ class QuadEnv(gym.Env):
             self.done_premature = True 
             return True
         
+        if(abs(Pos[2]-self.DesiredPos[2])>4): 
+            self.done_premature = True
+            return True
+        
         Or = Obs[3:6]
         if (abs(Or[0])>self.MAX_ROLL_PITCH):
             self.done_premature = True 
@@ -292,9 +306,10 @@ class QuadEnv(gym.Env):
             self.done_premature = True 
             return True
         
+        
+        
         return False
-    
-    
+      
 def test_env():
     env = QuadEnv(REAL_TIME=True)
     obs = env._getObservation()
@@ -305,11 +320,23 @@ def test_env():
     env.visualize_logs()
     env.save_logs()
     env.close()
+    
+def test_env_one_command():
+    env = QuadEnv(REAL_TIME=True, ONE_COMMAND= True)
+    obs = env._getObservation()
+    while True:
+        obs, reward, done, info = env.step(np.array([0]))
+        if(done): break
+        
+    env.visualize_logs()
+    env.save_logs()
+    env.close()
+    
 def check_gym_compatibility():
     env = QuadEnv(REAL_TIME=True)
     check_env(env)
     
 if __name__ == "__main__":
-    test_env()
+    test_env_one_command()
 
     
