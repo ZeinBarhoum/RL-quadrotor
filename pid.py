@@ -9,7 +9,7 @@ if __name__ == "__main__":
     obs = env._getObservation()
     while True:
         
-        action = agent.calculate_rpm(obs.P, obs.O, [1,3,5], [0,0,np.pi/3], obs.V)
+        action = agent.calculate_rpm(obs[0:3], obs[3:6], [0.5,0,2], [0,0,np.pi/3], obs[6:9])
         obs, reward, done, info = env.step(np.array(action), rpm= True)
 
         # print(action)

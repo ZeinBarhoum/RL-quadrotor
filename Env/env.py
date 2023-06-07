@@ -8,10 +8,16 @@ import matplotlib.pyplot as plt
 import numpy as np
 import time
 from collections import namedtuple
+import gym
+from stable_baselines3.common.env_checker import check_env
 
-class QuadEnv:
-    def __init__(self, EPS_TIME= 10, LOG_TIME= 0.1, REAL_TIME=False):
+class QuadEnv(gym.Env):
+    
+    metadata = {'render.modes': ['human']}
+    
+    def __init__(self, EPS_TIME= 5, LOG_TIME= 0.1, REAL_TIME=False, GUI= True, FLOOR= True):
         
+        self.FLOOR = FLOOR
         self.REAL_TIME = bool(REAL_TIME)
         self.DT = 1./240.
         self.G = 9.81
@@ -24,20 +30,43 @@ class QuadEnv:
         self.M = 0.027
         self.W = self.M*self.G
         self.HOVER_RPM = np.sqrt(self.W/(4*self.KF))
-        self.state_tuple = namedtuple('state_tuple', ['P', 'O', 'V', 'W', 'A'])
-        
-        self.physicsClient = p.connect(p.GUI)
+        # self.state_tuple = namedtuple('state_tuple', ['P', 'O', 'V', 'W', 'A'])
+        if(GUI):
+            self.physicsClient = p.connect(p.GUI)
+        else:
+            self.physicsClient = p.connect(p.DIRECT)
+            
         p.setAdditionalSearchPath(pybullet_data.getDataPath())
-        self.reset()
         
-        self.DesiredPos = np.array([0,0,1])
+        
+        self.DesiredPos = np.array([0,0,2])
+        self.StartPos = np.array([0,0,0.5])
 
         self.current_step = 0
         
         self.logtime = []
         self.logstates = []
+        self.logstates_normalized = []
         self.logactions = []
         self.logrewards = []
+        
+        self.MAX_VXY = 5
+        self.MAX_VZ = 2
+        self.MAX_XY = self.MAX_VXY*self.EPS_TIME
+        self.MAX_Z = self.MAX_VZ*self.EPS_TIME
+        
+        self.MAX_ROLL_PITCH = np.pi
+        
+        self.action_space = gym.spaces.Box(low=-1*np.ones(4), high=np.ones(4), dtype=np.float32)
+        
+        self.observation_space = gym.spaces.Box(low=np.array([-1,-1,0,-1,-1,-1,-1,-1,-1,-1,-1,-1]), 
+                                                high= np.array([1,1,1, 1,1,1, 1,1,1, 1,1,1]), 
+                                                dtype=np.float32)
+        
+        self.reset()
+        
+    def set_desired_pos(self, desired_pos):
+        self.DesiredPos = desired_pos
         
     def reset(self):
         self.last_action = np.array([0,0,0,0])
@@ -46,12 +75,17 @@ class QuadEnv:
         
         p.resetSimulation()
         p.setGravity(0,0,-self.G)
+        if self.FLOOR:
+            self.planeId = p.loadURDF("plane.urdf")
         
-        self.planeId = p.loadURDF("plane.urdf")
-        
-        startPos = [0,0,1]
         startOrientation = p.getQuaternionFromEuler([0,0,0])
-        self.droneId = p.loadURDF("Env/cf2x.urdf",startPos, startOrientation)
+        self.droneId = p.loadURDF("Env/cf2x.urdf",self.StartPos, startOrientation)
+        
+        self.done_premature = False
+
+        # print(self.observation_space, '\n', self._normalize_Observation(self._getObservation()))
+        
+        return self._normalize_Observation(self._getObservation())
     
     def step(self, action: np.ndarray, rpm= False):
         if(rpm):
@@ -62,8 +96,9 @@ class QuadEnv:
         p.stepSimulation()
         
         obs = self._getObservation()
-        reward = self._calculate_reward(obs)
+        obs_normalized = self._normalize_Observation(obs)
         done = self._calculate_done(obs)
+        reward = self._calculate_reward(obs)
         self.last_action = action
         if self.REAL_TIME:
             time.sleep(self.DT)
@@ -72,28 +107,35 @@ class QuadEnv:
             self.logstates.append(obs)
             self.logactions.append(action)
             self.logrewards.append(reward)
+            self.logstates_normalized.append(obs_normalized)
+            
         self.current_step += 1
-        return obs, reward, done, {}    
+        
+        self.done_premature = False
+        if(rpm):
+            return obs, reward, done, {}
+        
+        return obs_normalized, reward, done, {}    
     
     def get_logs_raw(self):
         return self.logstates, self.logactions, self.logrewards
     
     def get_logs_df(self):
-        x = [state.P[0] for state in self.logstates]
-        y = [state.P[1] for state in self.logstates]
-        z = [state.P[2] for state in self.logstates]
+        x = [state[0] for state in self.logstates]
+        y = [state[1] for state in self.logstates]
+        z = [state[2] for state in self.logstates]
         
-        vx = [state.V[0] for state in self.logstates]
-        vy = [state.V[1] for state in self.logstates]
-        vz = [state.V[2] for state in self.logstates]
+        vx = [state[6] for state in self.logstates]
+        vy = [state[7] for state in self.logstates]
+        vz = [state[8] for state in self.logstates]
         
-        phi = [state.O[0] for state in self.logstates]
-        theta = [state.O[1] for state in self.logstates]
-        psi = [state.O[2] for state in self.logstates] 
+        phi = [state[3] for state in self.logstates]
+        theta = [state[4] for state in self.logstates]
+        psi = [state[5] for state in self.logstates] 
         
-        wx = [state.W[0] for state in self.logstates]
-        wy = [state.W[1] for state in self.logstates]
-        wz = [state.W[2] for state in self.logstates]
+        wx = [state[9] for state in self.logstates]
+        wy = [state[10] for state in self.logstates]
+        wz = [state[11] for state in self.logstates]
         
         
         a1 = [action[0] for action in self.logactions]
@@ -164,8 +206,16 @@ class QuadEnv:
         plt.ylabel('Angular Velocity')
         plt.title('Angular Velocity')
         plt.show()
+        
     def close(self):
         p.disconnect()
+        
+    def render(self, mode="human"):
+        print('Rendering...')
+        print(f'Step: {self.current_step}')
+        print(f'Time: {self.current_step*self.DT}')
+        print(f'Current State: {self._normalize_Observation(self._getObservation())}')
+        
     def step_range(self, t):
         return range(int(t/self.DT))
     
@@ -173,7 +223,27 @@ class QuadEnv:
         dronePos, droneQuat = p.getBasePositionAndOrientation(self.droneId)
         droneEuler = p.getEulerFromQuaternion(droneQuat)
         droneV, droneW = p.getBaseVelocity(self.droneId)
-        return self.state_tuple(dronePos, droneEuler, droneV, droneW, self.last_action)
+        Obs= np.array([dronePos, droneEuler, droneV, droneW]).reshape(12,).astype(np.float32)
+        return Obs
+    
+    def _normalize_Observation(self, Obs):
+        
+        PosXY = np.clip(Obs[0:2], -self.MAX_XY, self.MAX_XY)/self.MAX_XY
+        PosZ = np.clip(Obs[2], 0, self.MAX_Z)/self.MAX_Z
+
+        OrRP = np.clip(Obs[3:5], -self.MAX_ROLL_PITCH, self.MAX_ROLL_PITCH)/self.MAX_ROLL_PITCH
+        OrY = Obs[5]/np.pi
+        
+        VXY = np.clip(Obs[6:8], -self.MAX_VXY, self.MAX_VXY)/self.MAX_VXY
+        VZ = np.clip(Obs[8], -self.MAX_VZ, self.MAX_VZ)/self.MAX_VZ
+        
+        W = Obs[9:12]
+        if(any(W)):
+            W = W/np.linalg.norm(W)
+        
+        return np.hstack([PosXY,PosZ, OrRP, OrY, VXY, VZ, W]).flatten().reshape(12,).astype(np.float32)
+
+        
     
     def _calculate_F_T(self, w_rpm):
         w_rpm = np.array(w_rpm)
@@ -194,18 +264,39 @@ class QuadEnv:
         return self.HOVER_RPM*(1+0.05*action)
     
     def _calculate_reward(self, Obs):
-        Pos = Obs.P
+        if(self.done_premature):
+            return -1000
+        
+        Pos = Obs[0:3]
         return -np.linalg.norm(Pos-self.DesiredPos)**2
     
     def _calculate_done(self, Obs):
         t = self.current_step*self.DT
-        if(t > self.EPS_TIME): return True
+        if(t > self.EPS_TIME): 
+            self.done_premature = False
+            return True
+        
+        Pos = Obs[0:3]
+        if(abs(Pos[0]-self.DesiredPos[0])>1):
+            self.done_premature = True 
+            return True
+        if(abs(Pos[1]-self.DesiredPos[1])>1): 
+            self.done_premature = True 
+            return True
+        
+        Or = Obs[3:6]
+        if (abs(Or[0])>self.MAX_ROLL_PITCH):
+            self.done_premature = True 
+            return True
+        if(abs(Or[1])>self.MAX_ROLL_PITCH): 
+            self.done_premature = True 
+            return True
+        
         return False
     
     
-
-if __name__ == "__main__":
-    env = QuadEnv(REAL_TIME=False)
+def test_env():
+    env = QuadEnv(REAL_TIME=True)
     obs = env._getObservation()
     while True:
         obs, reward, done, info = env.step(np.array([0,0,0,0]))
@@ -214,5 +305,11 @@ if __name__ == "__main__":
     env.visualize_logs()
     env.save_logs()
     env.close()
+def check_gym_compatibility():
+    env = QuadEnv(REAL_TIME=True)
+    check_env(env)
+    
+if __name__ == "__main__":
+    test_env()
 
     
