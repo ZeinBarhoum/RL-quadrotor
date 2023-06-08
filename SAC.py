@@ -1,5 +1,5 @@
 from Env.env import QuadEnv
-from stable_baselines3 import A2C
+from stable_baselines3 import SAC
 from stable_baselines3.common.callbacks import EvalCallback, StopTrainingOnRewardThreshold
 from stable_baselines3.common.policies import ActorCriticPolicy as a2cppoMlpPolicy
 import torch
@@ -24,16 +24,16 @@ if __name__ == "__main__":
                            net_arch=[512, 512, dict(vf=[256, 128], pi=[256, 128])]
                            )
     
-    model = A2C(a2cppoMlpPolicy, env_no_gui_train, verbose= 1, policy_kwargs=onpolicy_kwargs,).learn(total_timesteps=100000, callback= eval_callback, log_interval= 100)
+    model = SAC("MlpPolicy", env_no_gui_train, verbose= 1).learn(total_timesteps=1000000, callback= eval_callback, log_interval= 100)
     
-    model.save("A2C_TakeOFF")
+    model.save("SAC_TakeOFF")
 
     del model # remove to demonstrate saving and loading
     
     env_no_gui_train.close()
     # env_no_gui_eval.close()
     
-    model = A2C.load("A2C_TakeOFF")
+    model = SAC.load("SAC_TakeOFF")
     
     env_gui = QuadEnv(REAL_TIME= True, ONE_COMMAND= True, MODE= 'TakeOFF')
     
