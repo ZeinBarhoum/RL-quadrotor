@@ -3,7 +3,7 @@ from Env.env import QuadEnv
 import numpy as np
 
 if __name__ == "__main__":
-    env = QuadEnv(REAL_TIME=False,  MODE= 'TakeOFF')
+    env = QuadEnv(REAL_TIME=False, MODE= 'TakeOFF', EPS_TIME= 20)
     agent = PIDAgent()
     
     obs = env._getObservation()

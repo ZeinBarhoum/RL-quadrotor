@@ -55,8 +55,15 @@ class QuadEnv(gym.Env):
         
         self.MAX_VXY = 5
         self.MAX_VZ = 2
-        self.MAX_XY = self.MAX_VXY*self.EPS_TIME
-        self.MAX_Z = self.MAX_VZ*self.EPS_TIME
+        
+        self.MAX_XY = 5
+        self.MAX_Z = 5
+        
+        # self.MAX_XY = self.MAX_VXY*5
+        # self.MAX_Z = self.MAX_VZ*5
+
+        # self.MAX_XY = self.MAX_VXY*self.EPS_TIME
+        # self.MAX_Z = self.MAX_VZ*self.EPS_TIME
         
         self.MAX_ROLL_PITCH = np.pi
         
@@ -97,11 +104,10 @@ class QuadEnv(gym.Env):
     def step(self, action: np.ndarray, rpm= False):
         if(self.ONE_COMMAND):
             action = np.array([action]*4).reshape(4,)
-            
-        if(rpm):
-            F, T = self._calculate_F_T(action)
-        else:
-            F, T = self._calculate_F_T(self._calculate_rpm(action))
+        
+        if(not rpm):
+            action = self._calculate_rpm(action)
+        F, T = self._calculate_F_T(action)
         self._apply_F_T(F, T)
         p.stepSimulation()
         
@@ -180,7 +186,7 @@ class QuadEnv(gym.Env):
     def visualize_logs(self):
         df = self.get_logs_df()
         plt.figure(figsize=(20,10))
-        plt.subplot(2,2,1)
+        plt.subplot(2,3,1)
         plt.plot(df.index, df.x, label='x')   
         plt.plot(df.index, df.y, label='y') 
         plt.plot(df.index, df.z, label='z')  
@@ -189,7 +195,7 @@ class QuadEnv(gym.Env):
         plt.ylabel('Position')
         plt.title('Position')
         #repeat for orientation
-        plt.subplot(2,2,2)
+        plt.subplot(2,3,2)
         plt.plot(df.index, df.phi, label='phi')   
         plt.plot(df.index, df.theta, label='theta') 
         plt.plot(df.index, df.psi, label='psi')  
@@ -198,7 +204,7 @@ class QuadEnv(gym.Env):
         plt.ylabel('Orientation')
         plt.title('Orientation')
         #repeat for velocity
-        plt.subplot(2,2,3)
+        plt.subplot(2,3,4)
         plt.plot(df.index, df.vx, label='vx')   
         plt.plot(df.index, df.vy, label='vy') 
         plt.plot(df.index, df.vz, label='vz')  
@@ -207,7 +213,7 @@ class QuadEnv(gym.Env):
         plt.ylabel('Velocity')
         plt.title('Velocity')
         #repeat for angular velocity
-        plt.subplot(2,2,4)
+        plt.subplot(2,3,5)
         plt.plot(df.index, df.wx, label='wx')   
         plt.plot(df.index, df.wy, label='wy') 
         plt.plot(df.index, df.wz, label='wz')  
@@ -215,7 +221,23 @@ class QuadEnv(gym.Env):
         plt.xlabel('Time')
         plt.ylabel('Angular Velocity')
         plt.title('Angular Velocity')
+        #Rewards
+        plt.subplot(2,3,3)
+        plt.plot(df.index, self.logrewards, label='r')   
+        plt.legend()
+        plt.xlabel('Time')
+        plt.ylabel('Rewards')
+        plt.title('Rewards')
+        #Actions
+        plt.subplot(2,3,6)
+        plt.plot(df.index, self.logactions)   
+        plt.legend()
+        plt.xlabel('Time')
+        plt.ylabel('Actions')
+        plt.title('Actions')
+        
         plt.show()
+        
         
     def close(self):
         p.disconnect()
@@ -322,15 +344,18 @@ def test_env():
     env.close()
     
 def test_env_one_command():
-    env = QuadEnv(REAL_TIME=True, ONE_COMMAND= True)
-    obs = env._getObservation()
+    env = QuadEnv(REAL_TIME=False, ONE_COMMAND= True, MODE= 'TakeOFF', EPS_TIME= 20)
+    obs = env.reset()
+    rewards = 0
     while True:
         obs, reward, done, info = env.step(np.array([0]))
+        rewards += reward
         if(done): break
         
     env.visualize_logs()
     env.save_logs()
     env.close()
+    print(f'{rewards=}')
     
 def check_gym_compatibility():
     env = QuadEnv(REAL_TIME=True)
