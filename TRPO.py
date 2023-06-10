@@ -78,9 +78,9 @@ def test():
     
     print(f'{rewards=}')
 if __name__ == "__main__":
-    train()
+    # train()
     test()
-    test_n_times(10)
+    # test_n_times(10)
     
     
     

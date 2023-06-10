@@ -7,17 +7,23 @@ The environment used is a custom created environment that uses pybullet as a sim
 The tested algorithms are DDPG, SAC, PPO, TRPO.
 
 ## Running
+
 For best algorithm results `SAC`, run the following in the project root folder
+
 ```bash
 python3 SAC.py
 ```
+
 To run other algorithms, inside the root folder run the following in the project root folder
+
 ```bash
 python3 <algo>.py
 ```
-where `<algo>` is one of the following: `pid`,`DDPG`, `SAC`, `PPO`, `TRPO`.
+
+Where `<algo>` is one of the following: `pid`,`DDPG`, `SAC`, `PPO`, `TRPO`.
 
 ## Dependencies
+
 - `numpy`
 - `scipy`
 - `matplotlib`
